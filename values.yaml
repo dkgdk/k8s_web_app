@@ -1,0 +1,32 @@
+# Global variables
+odoo_replicaCount: 1
+
+odoo:
+  image: odoo:16
+  containerPort: 8069
+  hostPort: 80
+  pvcSize: 2Gi
+  addonsPath: /mnt/odoo_addons
+  dataDir: /var/lib/odoo
+  adminPassword: admin
+
+postgres:
+  image: postgres:15
+  dbName: odoo
+  dbUser: odoo
+  dbPassword: odoo
+  pvcSize: 2Gi
+
+service:
+  type: NodePort
+  nodePort: 30069
+  port: 8069
+
+db:
+  host: odoo-db
+  port: 5432
+  user: odoo
+  password: odoo
+
+admin_password: admin
+

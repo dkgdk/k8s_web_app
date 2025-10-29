@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: odoo-app
+spec:
+  replicas: {{ .Values.odoo_replicaCount }}
+  selector:
+    matchLabels:
+      app: odoo-app
+  template:
+    metadata:
+      labels:
+        app: odoo-app
+    spec:
+      containers:
+        - name: odoo
+          image: {{ .Values.odoo.image }}
+          ports:
+            - containerPort: {{ .Values.odoo.containerPort }}
+              # hostPort: {{ .Values.odoo.hostPort }}
+          env:
+            - name: HOST
+              value: odoo-db
+            - name: USER
+              value: {{ .Values.postgres.dbUser }}
+            - name: PASSWORD
+              value: {{ .Values.postgres.dbPassword }}
+          command:
+            - bash
+            - -c
+            - |
+              echo "Waiting for PostgreSQL..." &&
+              until pg_isready -h odoo-db -p 5432 -U {{ .Values.postgres.dbUser }}; do sleep 2; done &&
+              echo "PostgreSQL is ready" &&
+              if [ ! -f {{ .Values.odoo.dataDir }}/.initialized ]; then
+                echo "Initializing Odoo database..." &&
+                odoo -c /etc/odoo.conf -d {{ .Values.postgres.dbName }} --init base --without-demo=all --stop-after-init &&
+                touch {{ .Values.odoo.dataDir }}/.initialized;
+              fi &&
+              echo "Starting Odoo..." &&
+              odoo -c /etc/odoo.conf
+          volumeMounts:
+            - name: web-storage
+              mountPath: {{ .Values.odoo.dataDir }}
+            - name: extra-addons
+              mountPath: {{ .Values.odoo.addonsPath }}
+            - name: odoo-config
+              mountPath: /etc/odoo.conf
+              subPath: odoo.conf
+      volumes:
+        - name: web-storage
+          persistentVolumeClaim:
+            claimName: web-pvc
+        - name: extra-addons
+          hostPath:
+            path: /mnt/odoo_addons
+        - name: odoo-config
+          configMap:
+            name: odoo-config
