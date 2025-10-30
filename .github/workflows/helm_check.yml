@@ -3,6 +3,7 @@ name: Helm Chart Validation
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   helm-check:
@@ -20,24 +21,18 @@ jobs:
       - name: Run Helm lint and template validation
         run: |
           set -e
-          echo "🔍 Running Helm Lint..."
-          helm lint ./charts/*
+          echo "Running Helm Lint..."
+          helm lint ./k8s_web_app
 
           echo "Rendering Helm templates..."
-          for chart in ./charts/*; do
-            if [ -d "$chart" ]; then
-              echo "Checking $chart ..."
-              helm template "$chart" >/dev/null
-            fi
-          done
-          echo "All templates rendered successfully!"
+          helm template ./k8s_web_app >/dev/null
+          echo "Helm lint & template validation successful."
 
-      # This block runs only if the above steps fail
       - name: Send mail if Helm validation fails
         if: failure()
         run: |
           set -e
-          echo "=== Helm Validation Failed — Sending Alert Mail ==="
+          echo "Helm Validation Failed — Sending Alert Mail"
 
           sudo apt update -y >/dev/null
           sudo DEBIAN_FRONTEND=noninteractive apt install -y mailutils msmtp msmtp-mta ca-certificates >/dev/null
