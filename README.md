@@ -1,56 +1,126 @@
-# k8s_web_app
-Kubernetes-Based Odoo ERP Platform
----------------------------------------
-k8s Odoo ERP with PostgreSQL and NGINX reverse proxy, using persistent volumes and container orchestration via Kubernetes or Docker.
+Kubernetes Web App – Odoo + PostgreSQL + Monitoring Stack
+-------------------------------------------------------------
 
-Features
-Containerized Odoo ERP and PostgreSQL services
+This repository contains a complete Helm-based Kubernetes deployment for an Odoo web application, integrated with PostgreSQL and a full monitoring + alert system using Grafana, Prometheus, and PostgreSQL exporter.
+
+Project Overview
+Component	Description
+Odoo	Main business application deployed on Kubernetes
+PostgreSQL	Database backend for Odoo
+Prometheus	Collects metrics from all monitored components
+Grafana	Visualization and dashboarding for metrics
+PostgreSQL Exporter	Exposes PostgreSQL metrics to Prometheus
+Alert System	Monitors container & port-forward status, sends email alerts
+GitHub Actions	Automatically lints Helm charts and sends mail if build fails
+
+Deployment Steps
+Prerequisites
+
+Kubernetes cluster (Minikube, EKS, GKE, etc.)
+
+Helm installed (v3+)
+
+Docker installed (for local monitoring)
+
+kubectl configured and connected to the cluster
+
+2️Deploy the Stack
+helm install odoo .
 
 
-NGINX reverse proxy to route requests to Odoo
+To upgrade:
 
-Clean separation of services and persistent storage
-
-Easily portable to Minikube, Docker, or any K8s environment
-
-Stack Overview
-Service	Purpose	Port
-Odoo	ERP Frontend + Backend (Python)	8069
-PostgreSQL	Database for Odoo	5432
-NGINX	Reverse proxy for Odoo UI	80
+helm upgrade odoo .
 
 
-How to Deploy (Minikube or K8s)
-kubectl apply -f pv/postgres-pv.yaml
-kubectl apply -f pv/odoo-pv.yaml
+To uninstall:
 
-kubectl apply -f postgres-deployment.yaml
+helm uninstall odoo
 
-kubectl apply -f odoo-deployment.yaml
+Monitoring Setup
+Grafana & Prometheus
 
-kubectl create configmap nginx-config --from-file=config/default.conf
-kubectl apply -f nginx-deployment.yaml
-Access Odoo
-minikube service nginx --url
-Open the returned URL in your browser (usually http://<minikube-ip>:<nodePort>).
+After deploying, run:
 
-NGINX Config (example)
-server {
-    listen 80;
+kubectl port-forward -n monitoring svc/grafana-service 3000:3000 &
+kubectl port-forward -n monitoring svc/prometheus-service 9090:9090 &
 
-    location / {
-        proxy_pass http://odoo:8069;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-Persistent Storage
-Odoo data stored at: /mnt/data/odoo
 
-PostgreSQL data stored at: /mnt/data/postgres
+Then open:
 
-Make sure Minikube allows host path access to these folders.
+Grafana: http://localhost:3000
 
-Requirements
-kubectl, minikube, or compatible K8s cluster Docker
+Prometheus: http://localhost:9090
 
+Default Grafana login (if unchanged):
+
+User: admin
+Password: admin
+
+PostgreSQL Exporter
+
+Automatically discovered by Prometheus
+
+Metrics available under /metrics endpoint
+
+Email Alert System
+Script: auto_container_watch_send_mail.sh
+
+This script:
+
+Monitors Docker containers & Kubernetes port-forwards
+
+Restarts them automatically if stopped
+
+Sends email alerts on:
+
+Container failure
+
+Restart events
+
+Port-forward failures
+
+Run manually:
+bash scripts/auto_container_watch_send_mail.sh
+
+Example alerts:
+
+Container Exited → Odoo stopped unexpectedly
+
+Port-forward Restarted → Prometheus/Grafana forward was lost and recovered
+
+GitHub Action: Helm Chart Validation
+
+Your workflow file: .github/workflows/helm-check.yml
+
+This workflow:
+
+Runs on main branch push or manual dispatch
+
+Validates your Helm charts (helm lint, helm template)
+
+Sends email notifications if any errors occur
+
+Secret Configuration
+Secret Name	Description
+SMTP_SERVER	e.g. smtp.gmail.com
+SMTP_PORT	usually 587
+SMTP_USER	your sender email
+SMTP_PASS	SMTP password or App Password
+ALERT_EMAILS	space or comma separated recipient list (e.g. admin@example.com, dev@example.com)
+
+You can add them in your repository settings:
+
+Settings → Secrets and variables → Actions → New repository secret
+
+Workflow Output
+Helm lint successful
+Templates rendered
+Email alert sent on failure
+
+.
+
+Contributing
+
+Pull requests are welcome!
+For major changes, please open an issue first to discuss what you'd like to improve.
