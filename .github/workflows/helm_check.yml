@@ -22,10 +22,10 @@ jobs:
         run: |
           set -e
           echo "Running Helm Lint..."
-          helm lint ./k8s_web_app
+          helm lint .
 
           echo "Rendering Helm templates..."
-          helm template ./k8s_web_app >/dev/null
+          helm template . >/dev/null
           echo "Helm lint & template validation successful."
 
       - name: Send mail if Helm validation fails
