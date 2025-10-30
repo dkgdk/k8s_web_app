@@ -1,0 +1,81 @@
+name: Helm Chart Validation
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  helm-check:
+    name: Helm Chart Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - name: Run Helm lint and template validation
+        run: |
+          set -e
+          echo "🔍 Running Helm Lint..."
+          helm lint ./charts/*
+
+          echo "Rendering Helm templates..."
+          for chart in ./charts/*; do
+            if [ -d "$chart" ]; then
+              echo "Checking $chart ..."
+              helm template "$chart" >/dev/null
+            fi
+          done
+          echo "All templates rendered successfully!"
+
+      # This block runs only if the above steps fail
+      - name: Send mail if Helm validation fails
+        if: failure()
+        run: |
+          set -e
+          echo "=== Helm Validation Failed — Sending Alert Mail ==="
+
+          sudo apt update -y >/dev/null
+          sudo DEBIAN_FRONTEND=noninteractive apt install -y mailutils msmtp msmtp-mta ca-certificates >/dev/null
+
+          sudo bash -c "cat > /etc/msmtprc" <<EOF
+          defaults
+          auth on
+          tls on
+          tls_trust_file /etc/ssl/certs/ca-certificates.crt
+          logfile /var/log/msmtp.log
+
+          account default
+          host $SMTP_SERVER
+          port $SMTP_PORT
+          from $SMTP_USER
+          user $SMTP_USER
+          password $SMTP_PASS
+          EOF
+
+          sudo chmod 600 /etc/msmtprc
+
+          IFS=', ' read -r -a EMAILS <<< "$ALERT_EMAILS"
+
+          HOST=$(hostname)
+          REPO="${GITHUB_REPOSITORY}"
+          BRANCH="${GITHUB_REF_NAME}"
+          RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          SUBJECT="Helm Validation Failed on ${REPO}:${BRANCH}"
+          BODY="Helm validation failed in repository: ${REPO}\n\nCheck details:\n${RUN_URL}\n\nHost: ${HOST}\nTimestamp: $(date)"
+
+          for EMAIL in "${EMAILS[@]}"; do
+            echo -e "$BODY" | mail -s "$SUBJECT" "$EMAIL"
+            echo "Sent failure mail to $EMAIL"
+          done
+        env:
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          ALERT_EMAILS: ${{ secrets.ALERT_EMAILS }}
