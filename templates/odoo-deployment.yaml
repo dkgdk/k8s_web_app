@@ -12,12 +12,28 @@ spec:
       labels:
         app: odoo-app
     spec:
+      # Pod-level securityContext
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+        - name: fix-permissions
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              chown -R 1000:1000 {{ .Values.odoo.dataDir }} {{ .Values.odoo.addonsPath }}
+              chmod -R 755 {{ .Values.odoo.dataDir }} {{ .Values.odoo.addonsPath }}
+          volumeMounts:
+            - name: web-storage
+              mountPath: {{ .Values.odoo.dataDir }}
+            - name: extra-addons
+              mountPath: {{ .Values.odoo.addonsPath }}
       containers:
         - name: odoo
           image: {{ .Values.odoo.image }}
           ports:
             - containerPort: {{ .Values.odoo.containerPort }}
-              # hostPort: {{ .Values.odoo.hostPort }}
           env:
             - name: HOST
               value: odoo-db
@@ -47,6 +63,9 @@ spec:
             - name: odoo-config
               mountPath: /etc/odoo.conf
               subPath: odoo.conf
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
       volumes:
         - name: web-storage
           persistentVolumeClaim:
