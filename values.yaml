@@ -30,3 +30,9 @@ db:
 
 admin_password: admin
 
+###############
+hpa:
+  enabled: true        # ADDED
+  minReplicas: 1       # ADDED
+  maxReplicas: 10      # ADDED
+  cpuUtilization: 85
